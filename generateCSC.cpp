@@ -1,25 +1,27 @@
 #include "generateCSC.h"
 
-/*Constructor of the class*/
+/**
+ * Constructor of the class
+ * @param: a is the number of advertising motes, 
+ *         s is the square side dimension
+ *         p is the eventual ploss
+ *         ra is the radius of the transmitting range circle
+ */
 generateCSC::generateCSC(int a, int s, double p, double ra)
 {
 	advNodes = a;
 	squareSide = s;
 	ploss = p;
-	advertiserPositions.init();
-	advertiserPositions.setRadius(ra);
-	r.init();
+	motePositions.init();
+	motePositions.setRadius(ra);
+	random.init();
 }
 
-string convertDouble(double t) 
-{
-	stringstream convert;	//needed to convert double to string
-	string tmpString;
-	convert << t;
-	tmpString = convert.str();
-	return tmpString;
-}
-
+/**
+ * Convert an integer to string
+ * @param: t is the integer to convert
+ * @return: the resultant string 
+ */
 string convertInt(int t)
 {
 	stringstream convert;	//needed to convert double to string
@@ -29,10 +31,12 @@ string convertInt(int t)
 	return tmpString;
 }
 
-/*
+/**
  * Generates the coordinator of the network
+ * and adds it to the group of motes
+ * @param: id of the node
  */
-void generateCSC::genCoordinatorMote() 
+void generateCSC::genCoordinatorMote(int id) 
 {
 	position p;
 	bool acceptable = false;
@@ -41,8 +45,8 @@ void generateCSC::genCoordinatorMote()
 	while(!acceptable) 
 	{
 		//compute the position in the square
-		int x = r.getNumber(squareSide);
-		int y = r.getNumber(squareSide);
+		int x = random.getNumber(squareSide);
+		int y = random.getNumber(squareSide);
 		
 		/*
 		* add the position in order to futher state the number of 
@@ -51,17 +55,19 @@ void generateCSC::genCoordinatorMote()
 		*/ 
 		p.x = x;
 		p.y = y;
+		p.id = id;
 		p.type = COORDINATOR;
-		acceptable = advertiserPositions.add(p);
+		acceptable = motePositions.add(p);
 	}
 
 }
 
-/*
- * @purpose: generate an advertising mote position
- * @parameter: the id of the node 
+/**
+ * Generate an advertising mote position and adds it to 
+ * the group of motes
+ * @param: the id of the node 
  */
-void generateCSC::genAdvMotes()
+void generateCSC::genAdvMotes(int id)
 {
 	position p;
 	bool acceptable = false;
@@ -69,8 +75,8 @@ void generateCSC::genAdvMotes()
 	while(!acceptable) 
 	{
 		//compute the position in the square
-		int x = r.getNumber(squareSide);
-		int y = r.getNumber(squareSide);
+		int x = random.getNumber(squareSide);
+		int y = random.getNumber(squareSide);
 		
 		/*
 		* add the position in order to futher state the number of 
@@ -79,25 +85,20 @@ void generateCSC::genAdvMotes()
 		*/ 
 		p.x = x;
 		p.y = y;
+		p.id = id;
 		p.type = ADVERTISER;
-		acceptable = advertiserPositions.add(p);
+		acceptable = motePositions.add(p);
 	}
-	
-	//select number of colliding nodes
-	/*int colliding = advertiserPositions.retrieveColliders();
-	
-	//complete the xml file
-	
-	//cout<<xml<<endl;
-	
-	return xml;*/
 }
 
-/*
- * @purpose: generate a new listener mote, 
- * this node position has to be at least in the area of another node 
+/**
+ * Generate a new listener mote, 
+ * this node position has to be at least in the area of another node and has to 
+ * be in different position w.r.t. other nodes.
+ * If everything is fine adds the mote to the group of motes
+ * @param: id of the node
  */
-string generateCSC::genListenerMote(int id)
+void generateCSC::genListenerMote(int id)
 {
 	position p;
 	bool acceptable = false;
@@ -105,8 +106,8 @@ string generateCSC::genListenerMote(int id)
 	while(!acceptable) 
 	{
 		//compute the position in the square
-		int x = r.getNumber(squareSide);
-		int y = r.getNumber(squareSide);
+		int x = random.getNumber(squareSide);
+		int y = random.getNumber(squareSide);
 		
 		/*
 		* add the position in order to further state the number of 
@@ -115,30 +116,39 @@ string generateCSC::genListenerMote(int id)
 		*/ 
 		p.x = x;
 		p.y = y;
+		p.id = id;
 		p.type = LISTENER;
-		acceptable = advertiserPositions.search(p);
+		acceptable = motePositions.setListener(p);
 	}
 }
 
 /**
  * creates the xml for an advertising mote, basing on its characteristics
- * @params: node id and node position
+ * @param: node id and node position
  * @return: the xml string that will be then written to a file
  */
 string generateCSC::xmlAdvMotes(int id, position p)
 {
+	//header
 	string xml = "\t\t<mote>\n\t\t\t<breakpoints />\n\t\t\t";
 	xml +="<interface_config>\n\t\t\t\tse.sics.cooja.interfaces.Position";
 	
 	//retrieve the number of colliding nodes from this node position
-	int colliders = advertiserPositions.retrieveColliders(id, p);
+	int colliders = motePositions.retrieveColliders(p);
 	
+	//check if colliders number exceeds the maximum value
+	if(colliders == -1)
+		return "";
+	
+	//positon
 	xml += "\n\t\t\t\t<x>" + convertInt(p.x) + "</x>";
 	xml += "\n\t\t\t\t<y>" + convertInt(p.y) + "</y>";
 	xml += "\n\t\t\t\t<z>0.0</z>\n\t\t\t</interface_config>";
+	
+	//footer
 	xml += "\n\t\t\t<interface_config>\n\t\t\t\tse.sics.cooja.mspmote.interfaces.MspMoteID";
 	xml += "\n\t\t\t\t<id>" + convertInt(id) + "</id>\n\t\t\t</interface_config>";
-	xml += "\n\t\t\t<motetype_identifier>sky" + convertInt(colliders + 7) + \
+	xml += "\n\t\t\t<motetype_identifier>sky" + convertInt(colliders + MAXCOLLIDERS) + \
 	"</motetype_identifier>";
 	xml += "\n\t\t</mote>\n";
 	
@@ -148,7 +158,7 @@ string generateCSC::xmlAdvMotes(int id, position p)
 /**
  * creates the xml for a listener node, sky15 is the identifier 
  * for a listener node
- * @params: node id and node position
+ * @param: node id and node position
  * @return: the xml string
  */
 string generateCSC::xmlListenerMote(int id, position p)
@@ -157,9 +167,12 @@ string generateCSC::xmlListenerMote(int id, position p)
 	string xml = "\t\t<mote>\n\t\t\t<breakpoints />\n\t\t\t"; 
 	xml += "<interface_config>\n\t\t\t\tse.sics.cooja.interfaces.Position";
 	
+	//position
 	xml += "\n\t\t\t\t<x>" + convertInt(p.x) + "</x>";
 	xml += "\n\t\t\t\t<y>" + convertInt(p.y) + "</y>";
 	xml += "\n\t\t\t\t<z>0.0</z>\n\t\t\t</interface_config>";
+	
+	//footer
 	xml += "\n\t\t\t<interface_config>\n\t\t\t\tse.sics.cooja.mspmote.interfaces.MspMoteID";
 	xml += "\n\t\t\t\t<id>" + convertInt(id) + "</id>\n\t\t\t</interface_config>";
 	xml += "\n\t\t\t<motetype_identifier>sky15</motetype_identifier>";
@@ -178,29 +191,40 @@ string generateCSC::xmlListenerMote(int id, position p)
  */
 string generateCSC::xmlCoordinatorMote(int id, position p)
 {
+	//header
 	string xml = "\t\t<mote>\n\t\t\t<breakpoints />\n\t\t\t";
 	xml +="<interface_config>\n\t\t\t\tse.sics.cooja.interfaces.Position";
 	
-	//complete the xml file
-	xml += "\n\t\t\t\t<x>" + convertDouble(p.x) + "</x>";
-	xml += "\n\t\t\t\t<y>" + convertDouble(p.y) + "</y>";
+	//position
+	xml += "\n\t\t\t\t<x>" + convertInt(p.x) + "</x>";
+	xml += "\n\t\t\t\t<y>" + convertInt(p.y) + "</y>";
+	
+	int colliders = motePositions.retrieveColliders(p);
+	
+	//check if colliders number exceeds the maximum value
+	if(colliders == -1)
+		return "";
+	
+	//footer
 	xml += "\n\t\t\t\t<z>0.0</z>\n\t\t\t</interface_config>";
 	xml += "\n\t\t\t<interface_config>\n\t\t\t\tse.sics.cooja.mspmote.interfaces.MspMoteID";
 	xml += "\n\t\t\t\t<id>" + convertInt(id) + "</id>\n\t\t\t</interface_config>";
-	xml += "\n\t\t\t<motetype_identifier>sky1</motetype_identifier>";
+	xml += "\n\t\t\t<motetype_identifier>sky" + \
+	convertInt(colliders) + "</motetype_identifier>";
 	xml += "\n\t\t</mote>\n";
 	
 	return xml;
 }
 
 
-/*
+/**
  * This is the function in charge of generating the csc file:
  * provided a schema that is the header of the csc file, 
  * this functions generates the number of needed motes in the 
  * area stated by the user
+ * @return: true if it was possible to generate the csc file, false otherwise
  */
-void generateCSC::cscInit()
+bool generateCSC::cscWrite()
 {
 	
 	string line;
@@ -210,7 +234,7 @@ void generateCSC::cscInit()
 	schema.open("schema.csc");
 	ofstream cscFile;
 	cscFile.open("advertising.csc", ios::app);
-	int i = 0;
+	int i = 1;
 	cout<<"doing copy"<<endl;
 	
 	//1 step: copy the content of schema.csc in advertising.csc
@@ -223,28 +247,65 @@ void generateCSC::cscInit()
 	//close the schema file
 	schema.close();
 	
-	cout<<"generating coordinator"<<endl;
-	string m;
-	m = genCoordinator(i); 
-	cscFile << m <<'\n';
-	cout<<"generating advertisers"<<endl;
+	cout<<"generating motes position"<<endl;
+	string xml;
 	
-	//now it's time to generate and add the various motes to the file
-	for( i = 1; i <= advNodes; i++ )
+	//BEGIN position generation
+	//int i = 1;
+	//geenerate coordinator
+	genCoordinatorMote(i); 
+	
+	//generate advertisers
+	for( i = 2; i <= advNodes + 1; i++ )
+		genAdvMotes(i);
+	
+	//generate listener
+	genListenerMote(i);
+	
+	//END position generation
+	
+	
+	/**
+	 * After generating nodes' position it's time to 
+	 * generate the xml description for each mote, this 
+	 * description highly depends upon the number of colliding
+	 * nodes in the neighborhood 
+	 */
+	
+	//BEGIN xml generation
+	
+	cout << "generate xml" << endl;
+	//keep into account coordinator too 
+	int nodes = advNodes + 1; 
+	for(i = 0; i < nodes; i++) 
 	{
-		m = genAdvMotes(i);
-		cscFile << m << '\n';
+		cout << "for cycle" <<endl;
+		int id = i + 1;
+		position p = motePositions.getPosition(i);
+		
+		//basing on the type of mote, generate the xml code
+		if(p.type == COORDINATOR)
+			xml = xmlCoordinatorMote(id, p);
+		if(p.type == ADVERTISER)
+			xml = xmlAdvMotes(id, p);
+		
+		if(xml == "")
+			return false;
+		//cout <<"XML: " << m <<endl;
+		
+		//write string on file
+		cscFile << xml << '\n';
 	}
 	
-	//generate and add the listener mote
-	m = genListenerMote(++i);
-	cscFile << m << '\n';
+	//retrieve listener
+	position p = motePositions.getPositionListener();
+	xml = xmlListenerMote(++i, p);
 	
-	cout<<"retrieveColliders"<<endl;
+	cscFile << xml << '\n';
 	
-	int n = advertiserPositions.retrieveColliders();
-	cout<<"Colliding nodes: "<<n<<endl;
+	//END xml generation
 	
+	cout << "epilogue" <<endl;
 	//now add the epilogue to the file
 	schema.open("epilogue.csc");
 	while( getline(schema, line) )
@@ -254,5 +315,9 @@ void generateCSC::cscInit()
 	schema.close();
 	
 	cscFile.close();
+	
+	cout << "END" <<endl;
+	
+	return true;
 	
 }

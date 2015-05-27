@@ -3,7 +3,8 @@
 #include <unistd.h>
 #include "generateCSC.h"
 
-/*@Antonio:
+/**
+ * @author: Antonio:
  * The aim of this program is to generate a new .csc file
  * according to some parameters that we give to the main.
  * Possible parameters are:
@@ -20,9 +21,25 @@ using namespace std;
 #define DEFAULT_SQUARE_SIDE 300
 #define DEFAULT_PLOSS 0
 #define DEFAULT_RADIUS 100
-int main(int argc, char **argv) {
+
+/**
+ * Print an help showing all the possible commands available for the user to generate
+ * a correct csc file
+ */
+void printHelp() 
+{
+	cout << "Available comands are\n\t" \
+		"-a: number of advertising motes (coordinator excluded)\n\t" \
+		"-s: size of the square side \n\t" \
+		"-p: possible ploss\n\t" \
+		"-r: transmitting range\n\t" \
+		"-h: privides this help\n";
+}
+
+int main(int argc, char **argv) 
+{
 	
-	//Assignements
+	//Assignements to default values
 	int advNodes = DEFAULT_ADV;
 	int squareSide = DEFAULT_SQUARE_SIDE;
 	double ploss = DEFAULT_PLOSS;
@@ -30,7 +47,7 @@ int main(int argc, char **argv) {
 	
 	//BEGIN Parsing of arguments
 	char c;
-	while ((c = getopt(argc, argv, "a:s:p:r:")) != -1)
+	while ((c = getopt(argc, argv, "a:s:p:r:h")) != -1)
 	{
 		switch(c)
 		{
@@ -46,6 +63,9 @@ int main(int argc, char **argv) {
 			case 'r':
 				radius = atof(optarg);
 				break;
+			case 'h':
+				printHelp();
+				return 0;
 			case '?':
 				cout<<"Unsupported argument\n";
 				break;
@@ -53,9 +73,30 @@ int main(int argc, char **argv) {
 	}
 	//END parsing
 	
-	cout<<"parsing ended"<<endl;
-	
 	generateCSC gcsc = generateCSC(advNodes, squareSide, ploss, radius);
-	gcsc.cscInit();
+	bool acceptedCSC = false;
+	
+	/**
+	 * Until a correctly generated csc file is not generated
+	 * continue generating the file
+	 */
+	while (!acceptedCSC)
+	{
+		acceptedCSC = gcsc.cscWrite();
+		
+		/**
+		 * If the generatedCSC is wrong, delete it
+		 * NOTE: it is possible to write this part of code
+		 * at the top, right before the gcsc.cscWrite, but 
+		 * behaving in this way would lead to a deletion of 
+		 * a file that hasn't been generated yet, to avoid this, 
+		 * the deletion is done here.
+		 */
+		if(acceptedCSC == false)
+		{
+			remove( "advertising.csc" );
+		}
+	}
+	
 	
 }
